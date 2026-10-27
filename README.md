@@ -1,145 +1,288 @@
-# Open Nederlandse Postcode API – Documentatie
+# Open Nederlandse Postcode API v2
 
-[Open Postcode](https://openpostcode.nl) is een eenvoudige API waarmee je op basis van een Nederlandse postcode en huisnummer het bijbehorende adres en woonplaats kunt opvragen. Superhandig om automatisch formulieren aan te vullen, bijvoorbeeld.
+[Open Postcode](https://openpostcode.nl) is een API voor het opzoeken van Nederlandse adressen op basis van postcode, huisnummer, straat, plaats of coordinaten. De API is gratis te gebruiken en vereist geen registratie of API-key.
 
-De **OpenPostcode API** biedt gratis toegang tot postcode- en adresdata voor heel Nederland. Geen registratie of API key vereist.
+Alle voorbeelden gebruiken de versie 2 API. De basis-URL is `https://openpostcode.nl`; gebruik daarachter de paden die hieronder staan.
 
-## Features
+## Algemene eigenschappen
 
-- **Volledig gratis**
-- **Geen API key nodig**
-- **JSON output die makkelijk te verwerken is**
-- **Ideaal voor webformulieren, CRM-integratie of datavalidatie**
+- Alle endpoints accepteren `GET`-requests en retourneren JSON.
+- Queryparameters mogen als URL-encoded parameters worden meegestuurd.
+- `limit` bepaalt het maximale aantal resultaten. Voor adres- en postcodesearch is de standaard 20 en het maximum 100. Voor de dichtstbijzijnde adressen is de standaard 1 en het maximum 20.
+- Bij gepagineerde resultaten bevat `meta.nextCursor` een cursor voor de volgende pagina. Geef die ongewijzigd mee als `cursor`; zolang `nextCursor` ontbreekt, is er geen volgende pagina.
+- Een adresobject bevat onder andere `straat`, `huisnummer`, `huisletter`, `huisnummertoevoeging`, `postcode`, `woonplaats`, `gemeente`, `provincie`, `lat` en `lon`. Huisletter en toevoeging kunnen `null` zijn.
 
-## Beschikbare Endpoints
+Succesvolle antwoorden bevatten doorgaans `meta.apiVersion` met waarde `2`, plus query- en normalisatiegegevens. Fouten bevatten een HTTP-foutstatus en een gestructureerd `error`-object met `code` en `message`; aanvullende informatie staat eventueel in `error.details`.
 
-### 1. Adres op basis van postcode en huisnummer
+## 1. Adres opzoeken
 
-`GET /api/address?postcode=1017XN&huisnummer=42`
+Zoek een adres met postcode en huisnummer:
 
-**Voorbeeld response:**
+```http
+GET /api/v2/address?postcode=1017XN&huisnummer=42
+```
+
+Voorbeeldantwoord:
+
 ```json
 {
+  "meta": {
+    "apiVersion": 2,
+    "query": {
+      "postcode": "1017XN",
+      "huisnummer": "42"
+    },
+    "normalized": {
+      "postcode": "1017XN",
+      "huisnummer": 42,
+      "huisletter": null,
+      "huisnummertoevoeging": null
+    },
+    "limit": 20
+  },
   "postcode": "1017XN",
   "huisnummer": "42",
-  "straat": "Frederiksplein",
-  "buurt": "Frederikspleinbuurt",
-  "wijk": "De Weteringschans",
-  "woonplaats": "Amsterdam",
-  "gemeente": "Amsterdam",
-  "provincie": "Noord-Holland",
-  "latitude": 52.35999,
-  "longitude": 4.898108
-}
-```
-
-### 2. Beschikbare huisnummers op basis van postcode
-
-`GET /api/address?postcode=1017XN`
-
-**Voorbeeld response:**
-```json
-{
-  "error": "Huisnummer not found",
-  "suggestions": [
-    "26A",
-    "26B",
-    "26C",
-    "26D",
-    "26E",
-    "26F",
-    "26G",
-    "26H",
-    "26K",
-    "28",
-    "30",
-    "32A",
-    "32B",
-    "32C",
-    "32D",
-    "32E",
-    "32F",
-    "32G",
-    "32H",
-    "32K",
-    "34",
-    "38A",
-    "38B",
-    "38C",
-    "38D",
-    "40A",
-    "40B",
-    "40C",
-    "40D",
-    "42",
-    "52",
-    "54"
+  "count": 1,
+  "results": [
+    {
+      "straat": "Frederiksplein",
+      "huisnummer": 42,
+      "huisletter": null,
+      "huisnummertoevoeging": null,
+      "postcode": "1017XN",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland",
+      "lat": 52.35999,
+      "lon": 4.898108
+    }
   ]
 }
 ```
 
-### 3. Postcode zoeken op straat en plaats
+Voor adressen met een huisletter of toevoeging kun je `huisletter` en `huisnummertoevoeging` apart meegeven. Samengestelde huisnummers zoals `3d` worden ook geaccepteerd.
 
-`GET /api/postcode?straat=Damrak&plaats=Amsterdam`
+### Huisnummers bij een postcode
 
-(optioneel: huisnummer)
+Laat `huisnummer` weg om beschikbare huisnummers op te vragen:
 
-**Voorbeeld response:**
+```http
+GET /api/v2/address?postcode=1017XN
+```
+
+Voorbeeldantwoord:
+
 ```json
 {
-  "postcodes": [
-    "1012LG",
-    "1012LH",
-    "1012LJ",
-    "1012LK",
-    "1012LL",
-    "1012LM",
-    "1012LN",
-    "1012LP",
-    "1012ZH",
-    "1012ZJ"
-  ]
+  "meta": {
+    "apiVersion": 2,
+    "query": {
+      "postcode": "1017XN"
+    },
+    "normalized": {
+      "postcode": "1017XN"
+    },
+    "limit": 20
+  },
+  "postcode": "1017XN",
+  "count": 13,
+  "suggestions": ["26", "28", "30", "32", "34", "38", "40", "42", "44", "46", "48", "52", "54"]
 }
 ```
 
-Optioneel met huisnummer:
+Dit is een succesvolle response (`200`), geen foutmelding. Als er meer resultaten zijn dan de `limit`, gebruik dan de `meta.nextCursor` voor de volgende pagina.
 
-`GET /api/postcode?straat=Damrak&plaats=Amsterdam&huisnummer=1`
+## 2. Postcodes zoeken op straat en plaats
 
-**Voorbeeld response:**
+Zoek postcodes voor een straat en woonplaats:
+
+```http
+GET /api/v2/postcode?straat=Damrak&plaats=Amsterdam
+```
+
+Voorbeeldantwoord:
+
 ```json
 {
-  "postcode": "1012LG",
-  "huisnummer": "1",
+  "meta": {
+    "apiVersion": 2,
+    "query": {
+      "straat": "Damrak",
+      "plaats": "Amsterdam"
+    },
+    "normalized": {
+      "huisnummer": null
+    },
+    "limit": 20
+  },
   "straat": "Damrak",
-  "buurt": "Nieuwendijk-Noord",
-  "wijk": "Burgwallen-Nieuwe Zijde",
-  "woonplaats": "Amsterdam",
-  "gemeente": "Amsterdam",
-  "provincie": "Noord-Holland",
-  "latitude": 52.377144,
-  "longitude": 4.8980384
+  "plaats": "Amsterdam",
+  "huisnummer": null,
+  "count": 10,
+  "results": [
+    {
+      "postcode": "1012LG",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012LH",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012LJ",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012LK",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012LL",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012LM",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012LN",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012LP",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012ZH",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    },
+    {
+      "postcode": "1012ZJ",
+      "straat": "Damrak",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland"
+    }
+  ]
 }
 ```
 
-### 4. Adres zoeken op coördinaten
+Met de optionele parameter `huisnummer` beperk je de zoekopdracht tot dat huisnummer:
 
-`GET /api/nearest?latitude=52.3702&longitude=4.8952`
+```http
+GET /api/v2/postcode?straat=Damrak&plaats=Amsterdam&huisnummer=1
+```
 
-**Voorbeeld response:**
+Postcodezoekopdrachten kunnen gepagineerd worden met `limit` en `cursor`. De `results`-array bevat postcodegegevens; gebruik `/api/v2/address` als je de volledige adres- en coordinatengegevens nodig hebt.
+
+## 3. Dichtstbijzijnde adres zoeken
+
+Zoek het dichtstbijzijnde adres met breedtegraad (`latitude`) en lengtegraad (`longitude`):
+
+```http
+GET /api/v2/nearest?latitude=52.3702&longitude=4.8952
+```
+
+Voorbeeldantwoord:
+
 ```json
 {
-  "postcode": "1017XN",
-  "huisnummer": "42",
-  "straat": "Frederiksplein",
-  "buurt": "Frederikspleinbuurt",
-  "wijk": "De Weteringschans",
-  "woonplaats": "Amsterdam",
-  "gemeente": "Amsterdam",
-  "provincie": "Noord-Holland",
-  "latitude": 52.35999,
-  "longitude": 4.898108
+  "meta": {
+    "apiVersion": 2,
+    "query": {
+      "latitude": "52.3702",
+      "longitude": "4.8952"
+    },
+    "normalized": {
+      "latitude": 52.3702,
+      "longitude": 4.8952
+    },
+    "limit": 1
+  },
+  "latitude": 52.3702,
+  "longitude": 4.8952,
+  "count": 1,
+  "results": [
+    {
+      "straat": "Sint Agnietenstraat",
+      "huisnummer": 14,
+      "huisletter": null,
+      "huisnummertoevoeging": null,
+      "postcode": "1012EG",
+      "woonplaats": "Amsterdam",
+      "gemeente": "Amsterdam",
+      "provincie": "Noord-Holland",
+      "lat": 52.370315,
+      "lon": 4.895204,
+      "distance2": 0.00000001
+    }
+  ]
 }
 ```
 
----
+Gebruik `limit` om meer dan één nabij adres op te vragen. De adressen staan op volgorde van nabijheid. `distance2` is de berekende kwadratische afstand; de resultaatcoordinaten heten `lat` en `lon`.
+
+## Foutafhandeling
+
+Veelvoorkomende foutstatussen zijn:
+
+- `400 Bad Request`: ontbrekende of ongeldige parameters, of een ongeldige cursor.
+- `404 Not Found`: geen passend adres of geen postcode-resultaten.
+- `409 Conflict`: het opgegeven huisnummer verwijst naar meerdere varianten. Gebruik de suggesties in `error.details` om de huisletter of toevoeging te specificeren.
+
+Voorbeeld van een foutresponse:
+
+```json
+{
+  "meta": {
+    "apiVersion": 2,
+    "query": {
+      "postcode": "1017XN",
+      "huisnummer": "999999"
+    },
+    "normalized": {
+      "postcode": "1017XN",
+      "huisnummer": 999999,
+      "huisletter": null,
+      "huisnummertoevoeging": null
+    },
+    "limit": 20
+  },
+  "error": {
+    "code": "HUISNUMMER_NOT_FOUND",
+    "message": "Huisnummer not found",
+    "details": {
+      "postcode": "1017XN",
+      "huisnummer": "999999",
+      "suggestions": ["26", "28", "30"]
+    }
+  }
+}
+```
